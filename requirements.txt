@@ -1,0 +1,6 @@
+streamlit>=1.43.0
+langchain>=0.3.0
+langchain-google-genai>=2.1.0
+neo4j>=5.28.0
+python-dotenv>=1.0.1
+

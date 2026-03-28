@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Local runtime / state
+*.log
+*.sqlite
+*.db
+.env
+.env.*
+pytest-cache-files-*/
+
