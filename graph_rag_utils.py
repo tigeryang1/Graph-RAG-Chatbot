@@ -43,6 +43,13 @@ STOPWORDS = {
     "the",
 }
 
+DEFAULT_MODEL_OPTIONS = [
+    "Gemini 2.5 Flash",
+    "Gemini 3 Flash",
+    "Gemini 2.5 Flash Lite",
+    "Gemini 3.1 Flash Lite",
+]
+
 
 GRAPH_SEARCH_CYPHER = """
 MATCH (n)
@@ -95,6 +102,68 @@ def build_llm(model_name: str, temperature: float) -> Any:
         google_api_key=api_key,
         temperature=temperature,
     )
+
+
+def get_available_models() -> list[str]:
+    env_value = os.getenv("GEMINI_AVAILABLE_MODELS", "")
+    configured = [item.strip() for item in env_value.split(",") if item.strip()]
+    models = configured or DEFAULT_MODEL_OPTIONS
+    return list(dict.fromkeys(models))
+
+
+def parse_model_chain(primary_model: str, fallback_models: list[str] | None = None) -> list[str]:
+    configured = fallback_models or []
+    if not configured:
+        env_value = os.getenv("GEMINI_FALLBACK_MODELS", "")
+        configured = [item.strip() for item in env_value.split(",") if item.strip()]
+
+    chain: list[str] = []
+    for candidate in [primary_model, *configured, *get_available_models()]:
+        if candidate and candidate not in chain:
+            chain.append(candidate)
+    return chain
+
+
+def is_model_limit_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    signals = [
+        "429",
+        "quota",
+        "rate limit",
+        "resource exhausted",
+        "resource_exhausted",
+        "too many requests",
+        "exceeded",
+        "limit reached",
+    ]
+    return any(signal in message for signal in signals)
+
+
+def invoke_with_model_fallback(
+    messages: list[Any],
+    model_chain: list[str],
+    temperature: float,
+    llm_builder=build_llm,
+) -> tuple[Any, str, list[str]]:
+    if not model_chain:
+        raise ValueError("Model chain is empty.")
+
+    errors: list[str] = []
+    last_exc: Exception | None = None
+    for index, model_name in enumerate(model_chain):
+        try:
+            llm = llm_builder(model_name=model_name, temperature=temperature)
+            response = llm.invoke(messages)
+            return response, model_name, errors
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if index == len(model_chain) - 1 or not is_model_limit_error(exc):
+                raise
+            errors.append(f"{model_name}: {exc}")
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Model invocation failed without an exception.")
 
 
 def get_neo4j_settings() -> dict[str, str | None]:

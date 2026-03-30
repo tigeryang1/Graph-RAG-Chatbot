@@ -8,6 +8,7 @@ Sample Graph RAG chatbot built with `Streamlit`, `LangChain`, the Gemini Develop
 - searches the graph with a generic Cypher query based on question keywords
 - turns matching nodes and relationships into textual graph context
 - sends that graph context to Gemini for answer generation
+- automatically falls back to another Gemini model when the current one hits quota or rate limits
 - shows the last retrieved graph context and Cypher in the UI
 
 ## Project Files
@@ -31,6 +32,14 @@ pip install -r requirements.txt
 
 ```powershell
 Copy-Item .env.example .env
+```
+
+Optional model fallback chain:
+
+```text
+GEMINI_MODEL=Gemini 2.5 Flash
+GEMINI_FALLBACK_MODELS=Gemini 3 Flash,Gemini 2.5 Flash Lite,Gemini 3.1 Flash Lite
+GEMINI_AVAILABLE_MODELS=Gemini 2.5 Flash,Gemini 3 Flash,Gemini 2.5 Flash Lite,Gemini 3.1 Flash Lite
 ```
 
 4. Make sure local Neo4j is running, for example at:
@@ -61,4 +70,4 @@ The generic Cypher query scans node property values for the extracted keywords, 
 - This is a sample Graph RAG project, not a production graph planner.
 - The Cypher is intentionally generic so it can run against many local graphs.
 - For stronger results, replace the generic Cypher with domain-specific graph traversal rules.
-
+- The app only switches models automatically for quota and rate-limit style failures, not for invalid prompts, auth failures, or other hard errors.
