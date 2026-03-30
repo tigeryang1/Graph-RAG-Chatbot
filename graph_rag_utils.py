@@ -44,11 +44,17 @@ STOPWORDS = {
 }
 
 DEFAULT_MODEL_OPTIONS = [
-    "Gemini 2.5 Flash",
-    "Gemini 3 Flash",
-    "Gemini 2.5 Flash Lite",
     "Gemini 3.1 Flash Lite",
+    "Gemini 3 Flash",
+    "Gemini 2.5 Flash",
+    "Gemini 2.5 Flash Lite",
 ]
+MODEL_NAME_ALIASES = {
+    "Gemini 3.1 Flash Lite": "gemini-3.1-flash-lite-preview",
+    "Gemini 3 Flash": "gemini-3-flash-preview",
+    "Gemini 2.5 Flash": "gemini-2.5-flash",
+    "Gemini 2.5 Flash Lite": "gemini-2.5-flash-lite",
+}
 
 
 GRAPH_SEARCH_CYPHER = """
@@ -98,7 +104,7 @@ def build_llm(model_name: str, temperature: float) -> Any:
         raise ValueError("Missing GEMINI_API_KEY. Set it in your environment or a .env file.")
 
     return ChatGoogleGenerativeAI(
-        model=model_name,
+        model=MODEL_NAME_ALIASES.get(model_name, model_name),
         google_api_key=api_key,
         temperature=temperature,
     )
@@ -135,6 +141,10 @@ def is_model_limit_error(exc: Exception) -> bool:
         "too many requests",
         "exceeded",
         "limit reached",
+        "invalid_argument",
+        "unexpected model name format",
+        "model not found",
+        "unsupported model",
     ]
     return any(signal in message for signal in signals)
 

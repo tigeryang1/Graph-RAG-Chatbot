@@ -7,6 +7,7 @@ from graph_rag_utils import (
     invoke_with_model_fallback,
     is_model_limit_error,
     parse_model_chain,
+    MODEL_NAME_ALIASES,
 )
 
 
@@ -41,28 +42,34 @@ def test_build_graph_context_handles_empty_rows() -> None:
 
 def test_parse_model_chain_deduplicates_primary_and_fallbacks() -> None:
     chain = parse_model_chain(
-        "Gemini 2.5 Flash",
-        ["Gemini 3 Flash", "Gemini 2.5 Flash", "Gemini 2.5 Flash Lite"],
+        "Gemini 3.1 Flash Lite",
+        ["Gemini 3 Flash", "Gemini 3.1 Flash Lite", "Gemini 2.5 Flash"],
     )
-    assert chain == ["Gemini 2.5 Flash", "Gemini 3 Flash", "Gemini 2.5 Flash Lite", "Gemini 3.1 Flash Lite"]
+    assert chain == ["Gemini 3.1 Flash Lite", "Gemini 3 Flash", "Gemini 2.5 Flash", "Gemini 2.5 Flash Lite"]
 
 
 def test_get_available_models_uses_env(monkeypatch) -> None:
     monkeypatch.setenv(
         "GEMINI_AVAILABLE_MODELS",
-        "Gemini 2.5 Flash,Gemini 3 Flash,Gemini 2.5 Flash Lite,Gemini 3.1 Flash Lite",
+        "Gemini 3.1 Flash Lite,Gemini 3 Flash,Gemini 2.5 Flash,Gemini 2.5 Flash Lite",
     )
     assert get_available_models() == [
-        "Gemini 2.5 Flash",
-        "Gemini 3 Flash",
-        "Gemini 2.5 Flash Lite",
         "Gemini 3.1 Flash Lite",
+        "Gemini 3 Flash",
+        "Gemini 2.5 Flash",
+        "Gemini 2.5 Flash Lite",
     ]
 
 
 def test_is_model_limit_error_matches_quota_signals() -> None:
     assert is_model_limit_error(Exception("429 RESOURCE_EXHAUSTED: quota exceeded")) is True
+    assert is_model_limit_error(Exception("400 INVALID_ARGUMENT: unexpected model name format")) is True
     assert is_model_limit_error(Exception("Invalid API key")) is False
+
+
+def test_model_aliases_include_verified_preview_and_flash_ids() -> None:
+    assert MODEL_NAME_ALIASES["Gemini 3.1 Flash Lite"] == "gemini-3.1-flash-lite-preview"
+    assert MODEL_NAME_ALIASES["Gemini 3 Flash"] == "gemini-3-flash-preview"
 
 
 def test_invoke_with_model_fallback_switches_on_limit_error() -> None:
@@ -72,7 +79,7 @@ def test_invoke_with_model_fallback_switches_on_limit_error() -> None:
         class FakeLlm:
             def invoke(self, messages):
                 attempts.append(model_name)
-                if model_name == "Gemini 2.5 Flash":
+                if model_name == "Gemini 3.1 Flash Lite":
                     raise Exception("429 RESOURCE_EXHAUSTED: quota exceeded")
                 return SimpleNamespace(content=f"response from {model_name}")
 
@@ -80,12 +87,12 @@ def test_invoke_with_model_fallback_switches_on_limit_error() -> None:
 
     response, used_model, errors = invoke_with_model_fallback(
         messages=["hello"],
-        model_chain=["Gemini 2.5 Flash", "Gemini 3 Flash"],
+        model_chain=["Gemini 3.1 Flash Lite", "Gemini 3 Flash"],
         temperature=0.2,
         llm_builder=fake_builder,
     )
 
-    assert attempts == ["Gemini 2.5 Flash", "Gemini 3 Flash"]
+    assert attempts == ["Gemini 3.1 Flash Lite", "Gemini 3 Flash"]
     assert used_model == "Gemini 3 Flash"
     assert response.content == "response from Gemini 3 Flash"
     assert len(errors) == 1
