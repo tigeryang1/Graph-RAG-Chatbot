@@ -1,0 +1,16 @@
+Account: Acme Retail
+
+Customer profile:
+Acme Retail is an enterprise retail customer in North America focused on digital commerce modernization. The account is active and considered strategic because of its multi-region expansion plans and its high visibility with executive leadership.
+
+Business goals:
+- Improve online checkout conversion
+- Reduce outage risk during seasonal traffic peaks
+- Expand analytics and personalization capabilities across ecommerce channels
+
+Key stakeholders:
+- Maya Chen, VP Digital Commerce: executive sponsor for platform modernization
+- Jordan Patel, Director of Marketing: primary stakeholder for campaign measurement and growth programs
+
+Relationship summary:
+Acme currently has a major expansion opportunity tied to commerce platform growth. The account should be treated as high-touch because open revenue and support risk exist at the same time.

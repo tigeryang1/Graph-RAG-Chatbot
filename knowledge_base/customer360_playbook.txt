@@ -1,0 +1,18 @@
+Customer 360 Playbook
+
+How to interpret account relationship signals:
+
+1. Account plus open opportunity:
+This usually indicates active revenue motion. Mention the opportunity stage, owner, and any commercial blockers if available.
+
+2. Account plus open case:
+This indicates delivery or support risk. If an open case exists alongside an active opportunity, call out that the commercial motion may be at risk.
+
+3. Account plus contacts:
+Use contacts to identify stakeholders, executive sponsors, and business owners. Contacts help explain who matters in the relationship, not just what records exist.
+
+4. Account plus campaign influence:
+Use campaign relationships to explain pipeline context and how demand generation may support open revenue opportunities.
+
+5. Owner relationships:
+If a user owns an opportunity or case, mention the accountable person in summaries so the answer feels operational, not just descriptive.

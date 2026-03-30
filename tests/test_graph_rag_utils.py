@@ -1,13 +1,19 @@
 from types import SimpleNamespace
 
-from graph_rag_utils import (
-    build_graph_context,
-    extract_terms,
+from graph_rag_llm import (
+    MODEL_NAME_ALIASES,
+    extract_response_text,
     get_available_models,
     invoke_with_model_fallback,
     is_model_limit_error,
     parse_model_chain,
-    MODEL_NAME_ALIASES,
+    uses_structured_content_blocks,
+)
+from graph_rag_retrieval import (
+    build_graph_context,
+    build_dynamic_cypher_messages,
+    extract_terms,
+    validate_and_prepare_cypher,
 )
 
 
@@ -37,7 +43,7 @@ def test_build_graph_context_formats_rows() -> None:
 
 
 def test_build_graph_context_handles_empty_rows() -> None:
-    assert build_graph_context([]) == "No graph matches found."
+    assert build_graph_context([]) == "No customer relationship matches found."
 
 
 def test_parse_model_chain_deduplicates_primary_and_fallbacks() -> None:
@@ -72,6 +78,12 @@ def test_model_aliases_include_verified_preview_and_flash_ids() -> None:
     assert MODEL_NAME_ALIASES["Gemini 3 Flash"] == "gemini-3-flash-preview"
 
 
+def test_uses_structured_content_blocks_matches_gemini_31_flash_lite() -> None:
+    assert uses_structured_content_blocks("Gemini 3.1 Flash Lite") is True
+    assert uses_structured_content_blocks("gemini-3.1-flash-lite-preview") is True
+    assert uses_structured_content_blocks("Gemini 3 Flash") is False
+
+
 def test_invoke_with_model_fallback_switches_on_limit_error() -> None:
     attempts: list[str] = []
 
@@ -96,3 +108,85 @@ def test_invoke_with_model_fallback_switches_on_limit_error() -> None:
     assert used_model == "Gemini 3 Flash"
     assert response.content == "response from Gemini 3 Flash"
     assert len(errors) == 1
+
+
+def test_extract_response_text_reads_structured_content_blocks() -> None:
+    response = SimpleNamespace(
+        content=[
+            {
+                "type": "text",
+                "text": "Summary for Bright Foods.",
+                "extras": {"signature": "abc"},
+            },
+            {
+                "type": "text",
+                "text": "There is one pending support case.",
+            },
+        ]
+    )
+
+    assert extract_response_text(response, model_name="Gemini 3.1 Flash Lite") == (
+        "Summary for Bright Foods.\n\nThere is one pending support case."
+    )
+
+
+def test_build_dynamic_cypher_messages_includes_schema_instruction() -> None:
+    messages = build_dynamic_cypher_messages("Show me Bright Foods opportunities", limit=6)
+
+    assert "Allowed node labels" in messages[0].content
+    assert messages[1].content == "Show me Bright Foods opportunities"
+
+
+def test_validate_and_prepare_cypher_allows_safe_read_only_query() -> None:
+    cypher = """
+    MATCH (n:Account)-[r:TARGETS]-(m:Campaign)
+    RETURN
+        labels(n) AS source_labels,
+        properties(n) AS source_props,
+        type(r) AS rel_type,
+        labels(m) AS target_labels,
+        properties(m) AS target_props
+    """.strip()
+
+    prepared = validate_and_prepare_cypher(cypher, limit=5)
+
+    assert "LIMIT 5" in prepared
+    assert "MATCH (n:Account)-[r:TARGETS]-(m:Campaign)" in prepared
+
+
+def test_validate_and_prepare_cypher_rejects_write_queries() -> None:
+    cypher = """
+    MATCH (n:Account)
+    SET n.status = 'Active'
+    RETURN
+        labels(n) AS source_labels,
+        properties(n) AS source_props,
+        'NO_RELATION' AS rel_type,
+        [] AS target_labels,
+        {} AS target_props
+    """.strip()
+
+    try:
+        validate_and_prepare_cypher(cypher, limit=5)
+        assert False, "Expected ValueError"
+    except ValueError as exc:
+        assert "write" in str(exc).lower() or "unsupported" in str(exc).lower()
+
+
+def test_validate_and_prepare_cypher_rejects_unknown_labels() -> None:
+    cypher = """
+    MATCH (n:Lead)-[r:FOR_ACCOUNT]-(m:Opportunity)
+    RETURN
+        labels(n) AS source_labels,
+        properties(n) AS source_props,
+        type(r) AS rel_type,
+        labels(m) AS target_labels,
+        properties(m) AS target_props
+    LIMIT 5
+    """.strip()
+
+    try:
+        validate_and_prepare_cypher(cypher, limit=5)
+        assert False, "Expected ValueError"
+    except ValueError as exc:
+        assert "unsupported labels" in str(exc).lower()

@@ -1,0 +1,14 @@
+Account: Acme Retail
+
+Support summary:
+Acme has an active high-priority support case related to a checkout outage escalation. This issue is commercially sensitive because it affects customer conversion and executive confidence in platform reliability.
+
+Risk notes:
+- Open production issue impacts revenue operations
+- Support risk may influence deal timing and stakeholder confidence
+- Customer success and sales should coordinate messaging closely until the case is resolved
+
+Recommended handling:
+- Provide daily status updates
+- Align support messaging with the account executive
+- Escalate internally if customer-facing deadlines slip

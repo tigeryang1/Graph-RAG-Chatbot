@@ -1,0 +1,121 @@
+{
+  "accounts": [
+    {
+      "id": "acct_acme_001",
+      "name": "Acme Retail",
+      "industry": "Retail",
+      "region": "North America",
+      "tier": "Enterprise",
+      "status": "Active"
+    },
+    {
+      "id": "acct_bright_001",
+      "name": "Bright Foods",
+      "industry": "Consumer Goods",
+      "region": "North America",
+      "tier": "Mid-Market",
+      "status": "Active"
+    }
+  ],
+  "contacts": [
+    {
+      "id": "cont_acme_001",
+      "name": "Maya Chen",
+      "email": "maya.chen@acme.example",
+      "title": "VP Digital Commerce",
+      "account_id": "acct_acme_001"
+    },
+    {
+      "id": "cont_acme_002",
+      "name": "Jordan Patel",
+      "email": "jordan.patel@acme.example",
+      "title": "Director of Marketing",
+      "account_id": "acct_acme_001"
+    },
+    {
+      "id": "cont_bright_001",
+      "name": "Avery Brooks",
+      "email": "avery.brooks@bright.example",
+      "title": "Head of Revenue Operations",
+      "account_id": "acct_bright_001"
+    }
+  ],
+  "users": [
+    {
+      "id": "user_001",
+      "name": "Taylor Kim",
+      "role": "Account Executive"
+    },
+    {
+      "id": "user_002",
+      "name": "Riley Morgan",
+      "role": "Customer Success Manager"
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "opp_acme_001",
+      "name": "Acme Commerce Platform Expansion",
+      "stage": "Negotiation",
+      "amount": 250000,
+      "close_date": "2026-05-15",
+      "status": "Open",
+      "account_id": "acct_acme_001",
+      "owner_user_id": "user_001"
+    },
+    {
+      "id": "opp_bright_001",
+      "name": "Bright Foods Analytics Renewal",
+      "stage": "Proposal",
+      "amount": 95000,
+      "close_date": "2026-06-01",
+      "status": "Open",
+      "account_id": "acct_bright_001",
+      "owner_user_id": "user_001"
+    }
+  ],
+  "cases": [
+    {
+      "id": "case_acme_001",
+      "subject": "Checkout outage escalation",
+      "priority": "High",
+      "status": "Open",
+      "account_id": "acct_acme_001",
+      "owner_user_id": "user_002"
+    },
+    {
+      "id": "case_bright_001",
+      "subject": "Dashboard access issue",
+      "priority": "Medium",
+      "status": "Pending",
+      "account_id": "acct_bright_001",
+      "owner_user_id": "user_002"
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "camp_acme_001",
+      "name": "Acme Spring Retail Push",
+      "status": "Active",
+      "budget": 120000,
+      "account_id": "acct_acme_001"
+    },
+    {
+      "id": "camp_bright_001",
+      "name": "Bright Growth Webinar",
+      "status": "Completed",
+      "budget": 40000,
+      "account_id": "acct_bright_001"
+    }
+  ],
+  "campaign_influence": [
+    {
+      "campaign_id": "camp_acme_001",
+      "opportunity_id": "opp_acme_001"
+    },
+    {
+      "campaign_id": "camp_bright_001",
+      "opportunity_id": "opp_bright_001"
+    }
+  ]
+}

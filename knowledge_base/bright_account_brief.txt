@@ -1,0 +1,15 @@
+Account: Bright Foods
+
+Customer profile:
+Bright Foods is a mid-market consumer goods account in North America. The account is active and primarily focused on revenue operations efficiency and analytics visibility.
+
+Business goals:
+- Improve dashboard adoption for business users
+- Support renewal confidence with clearer reporting
+- Expand account engagement through targeted thought leadership programs
+
+Key stakeholder:
+- Avery Brooks, Head of Revenue Operations: primary business owner for analytics adoption and renewal value
+
+Relationship summary:
+Bright Foods has an open renewal-related opportunity and a pending support issue. The account has lower severity risk than Acme, but adoption friction should still be addressed before renewal close.
