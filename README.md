@@ -11,13 +11,13 @@ The app is designed to answer account questions such as:
 ## What The App Does
 
 - queries a local Neo4j graph that contains Salesforce-like customer relationship data
-- optionally retrieves matching note files from `knowledge_base/`
+- optionally retrieves matching note chunks from a local embedding + FAISS index built from `knowledge_base/`
 - sends the selected evidence to Gemini for answer generation
 - supports safe dynamic Cypher as an opt-in retrieval mode
 - shows the evidence used for the latest answer:
   - graph rows
   - Cypher query
-  - matched note files
+  - matched note chunks and source files
   - graph contribution summary
 
 ## Evidence Modes
@@ -25,11 +25,11 @@ The app is designed to answer account questions such as:
 The app supports three evidence modes:
 
 - `Graph + Notes`
-  - use Neo4j relationship evidence and matching note files together
+  - use Neo4j relationship evidence and local vector-note retrieval together
 - `Graph only`
   - use only Neo4j graph retrieval
 - `Notes only`
-  - skip Neo4j and answer only from the local note files
+  - skip Neo4j and answer only from the local note vector index
 
 This makes it easy to demo how graph retrieval changes the answer quality.
 
@@ -85,8 +85,12 @@ The sample dataset is intentionally small so the demo stays readable.
   - Gemini API key helpers
 - `graph_rag_llm.py`
   - Gemini model mapping, fallback, and response text extraction
-- `graph_rag_retrieval.py`
-  - Neo4j queries, safe dynamic Cypher validation, local note retrieval
+- `graph_retrieval.py`
+  - Neo4j queries, safe dynamic Cypher validation, graph rendering
+- `rag_notes.py`
+  - local embedding, FAISS note retrieval, and note-context formatting
+- `common_terms.py`
+  - shared question term extraction used by both graph and note retrieval
 - `graph_rag_state.py`
   - chat state and prompt assembly
 - `graph_rag_ui.py`
@@ -98,7 +102,7 @@ The sample dataset is intentionally small so the demo stays readable.
 - `load_customer360_seed.py`
   - loader for local Neo4j
 - `knowledge_base/`
-  - local narrative account notes used in note-based retrieval
+  - local narrative account notes used to build the note-side vector index
 - `DEMO.md`
   - demo script
 
@@ -133,6 +137,13 @@ Optional Gemini model config:
 GEMINI_MODEL=Gemini 3.1 Flash Lite
 GEMINI_FALLBACK_MODELS=Gemini 3 Flash,Gemini 2.5 Flash,Gemini 2.5 Flash Lite
 GEMINI_AVAILABLE_MODELS=Gemini 3.1 Flash Lite,Gemini 3 Flash,Gemini 2.5 Flash,Gemini 2.5 Flash Lite
+```
+
+The note-side RAG pipeline uses:
+
+```text
+Embedding model: gemini-embedding-001
+Vector store: local in-memory FAISS
 ```
 
 5. Start your local Neo4j DBMS.
@@ -179,7 +190,7 @@ For the latest answer, the app shows:
 - evidence mode
 - retrieval mode
 - graph rows retrieved
-- files used from `knowledge_base/`
+- note chunks retrieved from the local FAISS index and their source files
 - how the graph contributed to the answer
 - the last Cypher query used
 - Gemini model and fallback diagnostics
@@ -189,6 +200,6 @@ For the latest answer, the app shows:
 - This is a demo project, not a production graph planner.
 - The fixed query path is the most reliable mode for account-centered demos.
 - Dynamic Cypher is intentionally constrained to a small allowed schema and read-only operations.
-- The local note retrieval is lightweight and file-based, not a vector database.
+- The local note-side RAG path uses Gemini embeddings plus a local in-memory FAISS index.
+- The note index is rebuilt in memory from `knowledge_base/` when retrieval runs; it is not yet persisted to disk.
 - Gemini fallback handles quota and rate-limit style failures, and also helps when a selected model name is rejected.
-

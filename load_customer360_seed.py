@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import graph_rag_config
-from graph_rag_retrieval import get_neo4j_settings
+from graph_retrieval import get_neo4j_settings
 
 try:
     from neo4j import GraphDatabase

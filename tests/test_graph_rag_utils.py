@@ -9,16 +9,15 @@ from graph_rag_llm import (
     parse_model_chain,
     uses_structured_content_blocks,
 )
-from graph_rag_retrieval import (
+from graph_retrieval import (
     ACCOUNT_CENTERED_CYPHER,
     build_graph_context,
-    build_document_context,
     build_dynamic_cypher_messages,
-    extract_terms,
-    retrieve_supporting_docs,
     summarize_graph_contribution,
     validate_and_prepare_cypher,
 )
+from rag_notes import build_document_context, retrieve_supporting_docs
+from common_terms import extract_terms
 
 
 def test_extract_terms_filters_short_tokens() -> None:
@@ -203,7 +202,39 @@ def test_validate_and_prepare_cypher_rejects_unknown_labels() -> None:
 
 
 def test_retrieve_supporting_docs_finds_matching_account_notes() -> None:
-    hits = retrieve_supporting_docs("What is the risk profile for Bright Foods?")
+    class FakeDoc:
+        def __init__(self, name: str, path: str, content: str):
+            self.page_content = content
+            self.metadata = {"name": name, "path": path}
+
+    class FakeVectorStore:
+        def similarity_search_with_score(self, question: str, k: int):
+            assert "Bright Foods" in question
+            return [
+                (
+                    FakeDoc(
+                        "bright_account_brief.txt",
+                        "C:/tmp/bright_account_brief.txt",
+                        "Bright Foods is in active renewal discussions.",
+                    ),
+                    1.2,
+                )
+            ]
+
+    from rag_notes import build_note_vector_store, load_note_documents
+
+    original_load = load_note_documents
+    original_build = build_note_vector_store
+
+    try:
+        import rag_notes
+
+        rag_notes.load_note_documents = lambda: ["dummy"]  # type: ignore[assignment]
+        rag_notes.build_note_vector_store = lambda documents: FakeVectorStore()  # type: ignore[assignment]
+        hits = retrieve_supporting_docs("What is the risk profile for Bright Foods?")
+    finally:
+        rag_notes.load_note_documents = original_load  # type: ignore[assignment]
+        rag_notes.build_note_vector_store = original_build  # type: ignore[assignment]
 
     assert hits
     assert hits[0]["name"] == "bright_account_brief.txt"

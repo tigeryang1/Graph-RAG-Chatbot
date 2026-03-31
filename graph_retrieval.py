@@ -1,39 +1,15 @@
 import os
 import re
-from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
+
+from common_terms import extract_terms
 
 try:
     from neo4j import GraphDatabase
 except ModuleNotFoundError:  # pragma: no cover - optional until installed
     GraphDatabase = None
-
-
-WORD_RE = re.compile(r"[a-zA-Z0-9_]+")
-STOPWORDS = {
-    "what",
-    "does",
-    "about",
-    "with",
-    "from",
-    "that",
-    "this",
-    "have",
-    "into",
-    "your",
-    "their",
-    "there",
-    "where",
-    "when",
-    "which",
-    "would",
-    "could",
-    "should",
-    "and",
-    "the",
-}
 
 
 GRAPH_SEARCH_CYPHER = """
@@ -119,22 +95,6 @@ Requirements:
 - Prefer account-centric retrieval when the question mentions an account or customer name.
 - Limit results to at most {limit} rows.
 """.strip()
-
-KNOWLEDGE_BASE_DIR = Path(__file__).resolve().parent / "knowledge_base"
-
-
-def extract_terms(question: str, max_terms: int = 6) -> list[str]:
-    seen: list[str] = []
-    for token in WORD_RE.findall(question.lower()):
-        if len(token) < 3:
-            continue
-        if token in STOPWORDS:
-            continue
-        if token not in seen:
-            seen.append(token)
-        if len(seen) >= max_terms:
-            break
-    return seen
 
 
 def get_neo4j_settings() -> dict[str, str | None]:
@@ -297,58 +257,6 @@ def build_graph_context(rows: list[dict[str, Any]]) -> str:
         lines.append(
             f"{index}. ({source_labels} {source_props}) -[{rel_type}]- ({target_labels} {target_props})"
         )
-    return "\n".join(lines)
-
-
-def retrieve_supporting_docs(question: str, max_docs: int = 3) -> list[dict[str, str | int]]:
-    if not KNOWLEDGE_BASE_DIR.exists():
-        return []
-
-    terms = extract_terms(question, max_terms=8)
-    if not terms:
-        return []
-
-    hits: list[dict[str, str | int]] = []
-    for path in sorted(KNOWLEDGE_BASE_DIR.glob("*.txt")):
-        content = path.read_text(encoding="utf-8")
-        lower_content = content.lower()
-        lower_name = path.stem.lower()
-        score = 0
-        for term in terms:
-            score += lower_content.count(term)
-            if term in lower_name:
-                score += 2
-        if score <= 0:
-            continue
-
-        snippet = ""
-        for line in content.splitlines():
-            if any(term in line.lower() for term in terms):
-                snippet = line.strip()
-                break
-        if not snippet:
-            snippet = " ".join(content.split())[:180]
-
-        hits.append(
-            {
-                "name": path.name,
-                "path": str(path),
-                "score": score,
-                "snippet": snippet[:220],
-            }
-        )
-
-    hits.sort(key=lambda item: int(item["score"]), reverse=True)
-    return hits[:max_docs]
-
-
-def build_document_context(doc_hits: list[dict[str, str | int]]) -> str:
-    if not doc_hits:
-        return "No supporting account notes matched the question."
-
-    lines = []
-    for item in doc_hits:
-        lines.append(f"[{item['name']}] {item['snippet']}")
     return "\n".join(lines)
 
 

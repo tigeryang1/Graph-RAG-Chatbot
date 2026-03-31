@@ -28,3 +28,4 @@ MODEL_NAME_ALIASES = {
     "Gemini 2.5 Flash": "gemini-2.5-flash",
     "Gemini 2.5 Flash Lite": "gemini-2.5-flash-lite",
 }
+DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"

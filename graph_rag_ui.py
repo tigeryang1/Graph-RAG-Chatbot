@@ -3,10 +3,10 @@ import os
 import streamlit as st
 
 from graph_rag_auth import get_api_key_status, mask_secret
-from graph_rag_config import DEFAULT_EVIDENCE_MODE, DEFAULT_RETRIEVAL_MODE
+from graph_rag_config import DEFAULT_EMBEDDING_MODEL, DEFAULT_EVIDENCE_MODE, DEFAULT_RETRIEVAL_MODE
 from graph_rag_demo import DEMO_OVERVIEW, DEMO_PROMPTS
+from graph_retrieval import get_neo4j_settings
 from graph_rag_llm import get_available_models, parse_model_chain
-from graph_rag_retrieval import get_neo4j_settings
 
 
 def sidebar() -> tuple[str, list[str], float, int, str, str]:
@@ -47,7 +47,7 @@ def sidebar() -> tuple[str, list[str], float, int, str, str]:
         index=["Graph + Notes", "Graph only", "Notes only"].index(
             st.session_state.graph_evidence_mode or DEFAULT_EVIDENCE_MODE
         ),
-        help="Choose whether the answer should use Neo4j graph evidence, local note files, or both.",
+        help="Choose whether the answer should use Neo4j graph evidence, local vector-note RAG, or both.",
     )
     st.session_state.graph_evidence_mode = evidence_mode
     temperature = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.2, step=0.1)
@@ -80,6 +80,8 @@ def sidebar() -> tuple[str, list[str], float, int, str, str]:
     st.sidebar.write(f"Model chain: `{', '.join(parse_model_chain(model_name, fallback_models))}`")
     st.sidebar.write(f"Retrieval mode: `{retrieval_mode}`")
     st.sidebar.write(f"Evidence mode: `{evidence_mode}`")
+    st.sidebar.write(f"Note embedding model: `{DEFAULT_EMBEDDING_MODEL}`")
+    st.sidebar.write("Note index: `Local in-memory FAISS`")
     st.sidebar.write(f"Neo4j URI: `{neo4j_settings['uri']}`")
     st.sidebar.write(f"Neo4j user: `{neo4j_settings['username']}`")
     st.sidebar.write(f"Neo4j password: `{mask_secret(neo4j_settings['password'])}`")
@@ -122,20 +124,20 @@ def render_evidence_overview() -> None:
     metric_cols = st.columns(3)
     metric_cols[0].metric("Evidence mode", st.session_state.graph_evidence_mode)
     metric_cols[1].metric("Graph rows", row_count)
-    metric_cols[2].metric("Files used", file_count)
+    metric_cols[2].metric("Note chunks", file_count)
 
     left_col, right_col = st.columns([1.3, 1.0])
 
     with left_col:
-        st.markdown("**Files used in RAG**")
+        st.markdown("**Note chunks used in RAG**")
         if st.session_state.graph_evidence_mode == "Graph only":
             st.caption("Notes retrieval is disabled in Graph only mode.")
         elif not files_used:
-            st.caption("No supporting note files matched this question.")
+            st.caption("No note chunks matched this question.")
         else:
             for item in files_used:
                 st.markdown(f"- `{item['name']}`")
-                st.caption(str(item["snippet"]))
+                st.caption(f"Retrieved chunk: {item['snippet']}")
 
     with right_col:
         st.markdown("**How the graph helped**")
@@ -144,7 +146,7 @@ def render_evidence_overview() -> None:
         else:
             st.write(st.session_state.graph_last_graph_help or "No graph contribution summary available.")
         if st.session_state.graph_last_doc_context and st.session_state.graph_evidence_mode != "Graph only":
-            st.markdown("**Combined note context**")
+            st.markdown("**Combined vector-note context**")
             st.caption(st.session_state.graph_last_doc_context)
 
 
@@ -163,7 +165,7 @@ def render_context_panel() -> None:
             if st.session_state.graph_evidence_mode != "Notes only":
                 st.text(st.session_state.graph_last_context)
             if st.session_state.graph_evidence_mode != "Graph only":
-                st.markdown("**Supporting note context**")
+                st.markdown("**Supporting vector-note context**")
                 st.caption(st.session_state.graph_last_doc_context)
 
     with st.expander("Last model run", expanded=False):

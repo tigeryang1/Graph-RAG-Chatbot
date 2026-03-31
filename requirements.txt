@@ -1,5 +1,8 @@
 streamlit==1.55.0
 langchain==1.2.12
+langchain-community==0.4.1
+langchain-text-splitters==1.1.1
 langchain-google-genai==4.2.1
+faiss-cpu==1.13.0
 neo4j==6.1.0
 python-dotenv==1.2.2

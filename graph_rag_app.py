@@ -5,18 +5,17 @@ from graph_rag_llm import (
     invoke_with_model_fallback,
     parse_model_chain,
 )
-from graph_rag_retrieval import (
+from graph_retrieval import (
     build_graph_context,
-    build_document_context,
     build_dynamic_cypher_messages,
     execute_dynamic_cypher,
-    extract_terms,
     query_graph,
-    retrieve_supporting_docs,
     summarize_graph_contribution,
     validate_and_prepare_cypher,
 )
+from rag_notes import build_document_context, retrieve_supporting_docs
 from graph_rag_state import build_messages, init_state
+from common_terms import extract_terms
 from graph_rag_ui import (
     render_context_panel,
     render_demo_panel,
@@ -33,14 +32,15 @@ def main() -> None:
     st.title("Customer 360 Graph Assistant")
     st.caption("Streamlit + Gemini + local Neo4j customer relationship retrieval")
     st.write(
-        "This app retrieves account relationship context from a local Neo4j graph and asks Gemini "
-        "to summarize customer connections across contacts, opportunities, cases, campaigns, and owners."
+        "This app combines account relationship context from a local Neo4j graph with a local vector-note "
+        "RAG pipeline, then asks Gemini to summarize customer connections across contacts, opportunities, "
+        "cases, campaigns, and owners."
     )
 
     model_name, fallback_models, temperature, row_limit, retrieval_mode, evidence_mode = sidebar()
     st.markdown(
         "Ask account questions and choose whether the answer should use local Neo4j relationship evidence, "
-        "matching account-note files from `knowledge_base/`, or both."
+        "local vector-note retrieval from `knowledge_base/`, or both."
     )
 
     render_demo_panel()
