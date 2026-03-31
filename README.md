@@ -10,6 +10,9 @@ Customer 360 Graph RAG chatbot built with `Streamlit`, `LangChain`, the Gemini D
 - sends that graph context to Gemini for answer generation
 - automatically falls back to another Gemini model when the current one hits quota or rate limits
 - shows the last retrieved graph context and Cypher in the UI
+- surfaces the specific `knowledge_base/` note files used for the latest answer
+- explains how the Neo4j graph changed the outcome by summarizing relationship coverage
+- lets you switch between `Graph + Notes`, `Graph only`, and `Notes only`
 
 ## Project Files
 
@@ -71,6 +74,12 @@ streamlit run graph_rag_app.py
 ```
 
 The app includes a `Demo Guide` panel with prebuilt Customer 360 prompts you can load and run directly.
+It also includes an evidence section that shows:
+
+- which local note files were pulled into the prompt
+- how many graph rows were retrieved
+- how the graph contributed entity and relationship evidence to the answer
+- which evidence mode was active for that answer
 
 ## Customer 360 Use Case
 

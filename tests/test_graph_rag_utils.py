@@ -10,9 +10,13 @@ from graph_rag_llm import (
     uses_structured_content_blocks,
 )
 from graph_rag_retrieval import (
+    ACCOUNT_CENTERED_CYPHER,
     build_graph_context,
+    build_document_context,
     build_dynamic_cypher_messages,
     extract_terms,
+    retrieve_supporting_docs,
+    summarize_graph_contribution,
     validate_and_prepare_cypher,
 )
 
@@ -137,6 +141,12 @@ def test_build_dynamic_cypher_messages_includes_schema_instruction() -> None:
     assert messages[1].content == "Show me Bright Foods opportunities"
 
 
+def test_account_centered_cypher_reaches_two_hops_for_owners() -> None:
+    assert "[*1..2]" in ACCOUNT_CENTERED_CYPHER
+    assert "OWNS" in ACCOUNT_CENTERED_CYPHER
+    assert "MATCH (a:Account)" in ACCOUNT_CENTERED_CYPHER
+
+
 def test_validate_and_prepare_cypher_allows_safe_read_only_query() -> None:
     cypher = """
     MATCH (n:Account)-[r:TARGETS]-(m:Campaign)
@@ -190,3 +200,52 @@ def test_validate_and_prepare_cypher_rejects_unknown_labels() -> None:
         assert False, "Expected ValueError"
     except ValueError as exc:
         assert "unsupported labels" in str(exc).lower()
+
+
+def test_retrieve_supporting_docs_finds_matching_account_notes() -> None:
+    hits = retrieve_supporting_docs("What is the risk profile for Bright Foods?")
+
+    assert hits
+    assert hits[0]["name"] == "bright_account_brief.txt"
+
+
+def test_build_document_context_formats_file_snippets() -> None:
+    context = build_document_context(
+        [
+            {
+                "name": "bright_account_brief.txt",
+                "path": "C:/tmp/bright_account_brief.txt",
+                "score": 3,
+                "snippet": "Bright Foods is in active renewal discussions.",
+            }
+        ]
+    )
+
+    assert "[bright_account_brief.txt]" in context
+    assert "active renewal discussions" in context
+
+
+def test_summarize_graph_contribution_counts_entities_and_relationships() -> None:
+    summary = summarize_graph_contribution(
+        [
+            {
+                "source_labels": ["Account"],
+                "source_props": {"id": "acct_001", "name": "Bright Foods"},
+                "rel_type": "FOR_ACCOUNT",
+                "target_labels": ["Opportunity"],
+                "target_props": {"id": "opp_001", "name": "Renewal"},
+            },
+            {
+                "source_labels": ["User"],
+                "source_props": {"id": "user_001", "name": "Riley Morgan"},
+                "rel_type": "OWNS",
+                "target_labels": ["Case"],
+                "target_props": {"id": "case_001", "subject": "Dashboard access issue"},
+            },
+        ]
+    )
+
+    assert "Account: 1" in summary
+    assert "Opportunity: 1" in summary
+    assert "FOR_ACCOUNT" in summary
+    assert "OWNS" in summary

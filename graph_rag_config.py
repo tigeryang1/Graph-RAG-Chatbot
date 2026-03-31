@@ -16,6 +16,7 @@ DEFAULT_MODEL_OPTIONS = [
     "Gemini 2.5 Flash Lite",
 ]
 DEFAULT_RETRIEVAL_MODE = "Fixed query"
+DEFAULT_EVIDENCE_MODE = "Graph + Notes"
 DEFAULT_SYSTEM_PROMPT = (
     "You are a Customer 360 Graph RAG assistant. "
     "Use the retrieved Neo4j relationship context to explain how an account is connected to contacts, "

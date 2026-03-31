@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -42,6 +43,25 @@ WHERE any(term in $terms WHERE
 )
 OPTIONAL MATCH (n)-[r]-(m)
 RETURN
+    labels(n) AS source_labels,
+    properties(n) AS source_props,
+    type(r) AS rel_type,
+    labels(m) AS target_labels,
+    properties(m) AS target_props
+LIMIT $limit
+""".strip()
+
+ACCOUNT_CENTERED_CYPHER = """
+MATCH (a:Account)
+WHERE any(term in $terms WHERE
+    any(key in keys(a) WHERE toLower(toString(a[key])) CONTAINS term)
+)
+MATCH p = (a)-[*1..2]-(x)
+WHERE all(rel in relationships(p) WHERE type(rel) IN ['WORKS_FOR', 'FOR_ACCOUNT', 'OWNS', 'TARGETS', 'INFLUENCED'])
+  AND all(node in nodes(p) WHERE any(label in labels(node) WHERE label IN ['Account', 'Contact', 'Opportunity', 'Case', 'Campaign', 'User']))
+UNWIND range(0, size(relationships(p)) - 1) AS idx
+WITH nodes(p)[idx] AS n, relationships(p)[idx] AS r, nodes(p)[idx + 1] AS m
+RETURN DISTINCT
     labels(n) AS source_labels,
     properties(n) AS source_props,
     type(r) AS rel_type,
@@ -100,6 +120,8 @@ Requirements:
 - Limit results to at most {limit} rows.
 """.strip()
 
+KNOWLEDGE_BASE_DIR = Path(__file__).resolve().parent / "knowledge_base"
+
 
 def extract_terms(question: str, max_terms: int = 6) -> list[str]:
     seen: list[str] = []
@@ -149,6 +171,10 @@ def query_graph(question: str, limit: int = 8) -> dict[str, Any]:
     terms = extract_terms(question)
     if not terms:
         return {"terms": [], "rows": [], "cypher": GRAPH_SEARCH_CYPHER}
+
+    account_rows = _run_cypher(ACCOUNT_CENTERED_CYPHER, terms=terms, limit=limit)
+    if account_rows:
+        return {"terms": terms, "rows": account_rows, "cypher": ACCOUNT_CENTERED_CYPHER}
 
     rows = _run_cypher(GRAPH_SEARCH_CYPHER, terms=terms, limit=limit)
     return {"terms": terms, "rows": rows, "cypher": GRAPH_SEARCH_CYPHER}
@@ -272,3 +298,83 @@ def build_graph_context(rows: list[dict[str, Any]]) -> str:
             f"{index}. ({source_labels} {source_props}) -[{rel_type}]- ({target_labels} {target_props})"
         )
     return "\n".join(lines)
+
+
+def retrieve_supporting_docs(question: str, max_docs: int = 3) -> list[dict[str, str | int]]:
+    if not KNOWLEDGE_BASE_DIR.exists():
+        return []
+
+    terms = extract_terms(question, max_terms=8)
+    if not terms:
+        return []
+
+    hits: list[dict[str, str | int]] = []
+    for path in sorted(KNOWLEDGE_BASE_DIR.glob("*.txt")):
+        content = path.read_text(encoding="utf-8")
+        lower_content = content.lower()
+        lower_name = path.stem.lower()
+        score = 0
+        for term in terms:
+            score += lower_content.count(term)
+            if term in lower_name:
+                score += 2
+        if score <= 0:
+            continue
+
+        snippet = ""
+        for line in content.splitlines():
+            if any(term in line.lower() for term in terms):
+                snippet = line.strip()
+                break
+        if not snippet:
+            snippet = " ".join(content.split())[:180]
+
+        hits.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "score": score,
+                "snippet": snippet[:220],
+            }
+        )
+
+    hits.sort(key=lambda item: int(item["score"]), reverse=True)
+    return hits[:max_docs]
+
+
+def build_document_context(doc_hits: list[dict[str, str | int]]) -> str:
+    if not doc_hits:
+        return "No supporting account notes matched the question."
+
+    lines = []
+    for item in doc_hits:
+        lines.append(f"[{item['name']}] {item['snippet']}")
+    return "\n".join(lines)
+
+
+def summarize_graph_contribution(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "The graph did not add relationship evidence for this question."
+
+    rel_types = sorted({row.get("rel_type") for row in rows if row.get("rel_type")})
+    entity_counts = {
+        label: 0
+        for label in ["Account", "Contact", "Opportunity", "Case", "Campaign", "User"]
+    }
+    seen_entities: set[tuple[str, str]] = set()
+
+    for row in rows:
+        for side in ("source", "target"):
+            labels = row.get(f"{side}_labels") or []
+            props = row.get(f"{side}_props") or {}
+            entity_id = str(props.get("id") or props.get("name") or props.get("subject") or "")
+            for label in labels:
+                key = (label, entity_id)
+                if label in entity_counts and entity_id and key not in seen_entities:
+                    entity_counts[label] += 1
+                    seen_entities.add(key)
+
+    populated = [f"{label}: {count}" for label, count in entity_counts.items() if count]
+    rel_text = ", ".join(rel_types) if rel_types else "no explicit relationship types"
+    entity_text = ", ".join(populated) if populated else "no entity counts"
+    return f"The graph supplied relationship evidence across {entity_text}. Relationship types seen: {rel_text}."
