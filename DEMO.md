@@ -1,6 +1,6 @@
 # Customer 360 Demo Script
 
-## Goal
+## Goal1
 
 Demonstrate that the app can explain customer relationships from a Neo4j graph instead of just listing records.
 
