@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from graph_rag_llm import (
     MODEL_NAME_ALIASES,
     extract_response_text,
@@ -175,11 +177,8 @@ def test_validate_and_prepare_cypher_rejects_write_queries() -> None:
         {} AS target_props
     """.strip()
 
-    try:
+    with pytest.raises(ValueError, match=r"(?i)write|unsupported"):
         validate_and_prepare_cypher(cypher, limit=5)
-        assert False, "Expected ValueError"
-    except ValueError as exc:
-        assert "write" in str(exc).lower() or "unsupported" in str(exc).lower()
 
 
 def test_validate_and_prepare_cypher_rejects_unknown_labels() -> None:
@@ -194,11 +193,8 @@ def test_validate_and_prepare_cypher_rejects_unknown_labels() -> None:
     LIMIT 5
     """.strip()
 
-    try:
+    with pytest.raises(ValueError, match=r"(?i)unsupported labels"):
         validate_and_prepare_cypher(cypher, limit=5)
-        assert False, "Expected ValueError"
-    except ValueError as exc:
-        assert "unsupported labels" in str(exc).lower()
 
 
 def test_retrieve_supporting_docs_finds_matching_account_notes() -> None:
@@ -221,20 +217,15 @@ def test_retrieve_supporting_docs_finds_matching_account_notes() -> None:
                 )
             ]
 
-    from rag_notes import build_note_vector_store, load_note_documents
+    import rag_notes
 
-    original_load = load_note_documents
-    original_build = build_note_vector_store
+    original_get = rag_notes.get_vector_store
 
     try:
-        import rag_notes
-
-        rag_notes.load_note_documents = lambda: ["dummy"]  # type: ignore[assignment]
-        rag_notes.build_note_vector_store = lambda documents: FakeVectorStore()  # type: ignore[assignment]
+        rag_notes.get_vector_store = lambda: FakeVectorStore()  # type: ignore[assignment]
         hits = retrieve_supporting_docs("What is the risk profile for Bright Foods?")
     finally:
-        rag_notes.load_note_documents = original_load  # type: ignore[assignment]
-        rag_notes.build_note_vector_store = original_build  # type: ignore[assignment]
+        rag_notes.get_vector_store = original_get  # type: ignore[assignment]
 
     assert hits
     assert hits[0]["name"] == "bright_account_brief.txt"

@@ -74,17 +74,17 @@ def sidebar() -> tuple[str, list[str], float, int, str, str]:
     source, key = get_api_key_status()
     neo4j_settings = get_neo4j_settings()
     st.sidebar.divider()
-    st.sidebar.subheader("Diagnostics")
-    st.sidebar.write(f"Gemini key source: `{source}`")
-    st.sidebar.write(f"Gemini key detected: `{mask_secret(key)}`")
-    st.sidebar.write(f"Model chain: `{', '.join(parse_model_chain(model_name, fallback_models))}`")
-    st.sidebar.write(f"Retrieval mode: `{retrieval_mode}`")
-    st.sidebar.write(f"Evidence mode: `{evidence_mode}`")
-    st.sidebar.write(f"Note embedding model: `{DEFAULT_EMBEDDING_MODEL}`")
-    st.sidebar.write("Note index: `Local in-memory FAISS`")
-    st.sidebar.write(f"Neo4j URI: `{neo4j_settings['uri']}`")
-    st.sidebar.write(f"Neo4j user: `{neo4j_settings['username']}`")
-    st.sidebar.write(f"Neo4j password: `{mask_secret(neo4j_settings['password'])}`")
+    with st.sidebar.expander("Diagnostics", expanded=False):
+        st.write(f"Gemini key source: `{source}`")
+        st.write(f"Gemini key detected: `{mask_secret(key)}`")
+        st.write(f"Model chain: `{', '.join(parse_model_chain(model_name, fallback_models))}`")
+        st.write(f"Retrieval mode: `{retrieval_mode}`")
+        st.write(f"Evidence mode: `{evidence_mode}`")
+        st.write(f"Note embedding model: `{DEFAULT_EMBEDDING_MODEL}`")
+        st.write("Note index: `Local in-memory FAISS`")
+        st.write(f"Neo4j URI: `{neo4j_settings['uri']}`")
+        st.write(f"Neo4j user: `{neo4j_settings['username']}`")
+        st.write(f"Neo4j password: `{mask_secret(neo4j_settings['password'])}`")
     return model_name, fallback_models, temperature, row_limit, retrieval_mode, evidence_mode
 
 
@@ -95,7 +95,8 @@ def render_history() -> None:
 
 
 def render_demo_panel() -> None:
-    with st.expander("Demo Guide", expanded=True):
+    has_history = bool(st.session_state.graph_chat_history)
+    with st.expander("Demo Guide", expanded=not has_history):
         st.write(DEMO_OVERVIEW)
         st.write("Suggested prompts:")
         for item in DEMO_PROMPTS:
@@ -105,8 +106,9 @@ def render_demo_panel() -> None:
                 st.caption(item["why"])
                 st.code(item["prompt"])
             with cols[1]:
-                if st.button("Load", key=f"demo-{item['title']}"):
+                if st.button("Try it", key=f"demo-{item['title']}"):
                     st.session_state.graph_demo_prompt = item["prompt"]
+                    st.rerun()
 
 
 def render_evidence_overview() -> None:

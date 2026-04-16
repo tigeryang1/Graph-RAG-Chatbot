@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import graph_rag_config
-from graph_retrieval import get_neo4j_settings
+from graph_retrieval import close_driver, get_driver, get_neo4j_settings
 
 try:
     from neo4j import GraphDatabase
@@ -56,10 +56,7 @@ def main() -> None:
     data = load_seed_file(DEFAULT_DATA_FILE)
     print_diagnostics(settings, data)
     print("Connecting to Neo4j...")
-    driver = GraphDatabase.driver(
-        settings["uri"],
-        auth=(settings["username"], settings["password"]),
-    )
+    driver = get_driver()
 
     account_query = """
     UNWIND $rows AS row
@@ -154,7 +151,7 @@ def main() -> None:
         session.execute_write(run_write, campaign_influence_query, data.get("campaign_influence", []))
         print(f"- Loaded campaign influence links: {len(data.get('campaign_influence', []))}")
 
-    driver.close()
+    close_driver()
     print(f"Done. Loaded Customer 360 seed data from {DEFAULT_DATA_FILE}")
 
 
