@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,18 @@ except ModuleNotFoundError:  # pragma: no cover - optional until installed
 
 
 KNOWLEDGE_BASE_DIR = Path(__file__).resolve().parent / "knowledge_base"
+
+_cached_vector_store = None
+_cached_kb_fingerprint: str | None = None
+
+
+def _kb_fingerprint() -> str:
+    """Hash based on file paths, sizes, and modification times."""
+    entries: list[str] = []
+    for path in list_note_files():
+        stat = path.stat()
+        entries.append(f"{path}:{stat.st_size}:{stat.st_mtime_ns}")
+    return hashlib.md5("|".join(entries).encode()).hexdigest()
 
 
 def list_note_files() -> list[Path]:
@@ -62,12 +75,30 @@ def build_note_vector_store(documents: list[Document]):
     return FAISS.from_documents(documents, embedding=embeddings)
 
 
-def retrieve_supporting_docs(question: str, max_docs: int = 3) -> list[dict[str, str | int]]:
+def get_vector_store():
+    """Return the cached FAISS vector store, rebuilding only when knowledge_base files change."""
+    global _cached_vector_store, _cached_kb_fingerprint
+
+    fingerprint = _kb_fingerprint()
+    if _cached_vector_store is not None and fingerprint == _cached_kb_fingerprint:
+        return _cached_vector_store
+
     documents = load_note_documents()
     if not documents:
+        _cached_vector_store = None
+        _cached_kb_fingerprint = fingerprint
+        return None
+
+    _cached_vector_store = build_note_vector_store(documents)
+    _cached_kb_fingerprint = fingerprint
+    return _cached_vector_store
+
+
+def retrieve_supporting_docs(question: str, max_docs: int = 3) -> list[dict[str, str | int]]:
+    vector_store = get_vector_store()
+    if vector_store is None:
         return []
 
-    vector_store = build_note_vector_store(documents)
     matches = vector_store.similarity_search_with_score(question, k=max_docs)
 
     hits: list[dict[str, str | int]] = []

@@ -97,6 +97,9 @@ Requirements:
 """.strip()
 
 
+_driver = None
+
+
 def get_neo4j_settings() -> dict[str, str | None]:
     return {
         "uri": os.getenv("NEO4J_URI", "bolt://localhost:7687"),
@@ -105,7 +108,12 @@ def get_neo4j_settings() -> dict[str, str | None]:
     }
 
 
-def _run_cypher(cypher: str, **params: Any) -> list[dict[str, Any]]:
+def get_driver():
+    """Return a long-lived Neo4j driver, creating it on first call."""
+    global _driver
+    if _driver is not None:
+        return _driver
+
     if GraphDatabase is None:
         raise ModuleNotFoundError("neo4j is required to query the local graph.")
 
@@ -113,18 +121,26 @@ def _run_cypher(cypher: str, **params: Any) -> list[dict[str, Any]]:
     if not settings["password"]:
         raise ValueError("Missing NEO4J_PASSWORD. Set it in your environment or a .env file.")
 
-    driver = GraphDatabase.driver(
+    _driver = GraphDatabase.driver(
         settings["uri"],
         auth=(settings["username"], settings["password"]),
     )
-    try:
-        with driver.session() as session:
-            result = session.run(cypher, **params)
-            rows = [record.data() for record in result]
-    finally:
-        driver.close()
+    return _driver
 
-    return rows
+
+def close_driver() -> None:
+    """Shut down the pooled driver (useful for clean teardown)."""
+    global _driver
+    if _driver is not None:
+        _driver.close()
+        _driver = None
+
+
+def _run_cypher(cypher: str, **params: Any) -> list[dict[str, Any]]:
+    driver = get_driver()
+    with driver.session() as session:
+        result = session.run(cypher, **params)
+        return [record.data() for record in result]
 
 
 def query_graph(question: str, limit: int = 8) -> dict[str, Any]:
