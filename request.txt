@@ -1,0 +1,107 @@
+CP Server: salesforce
+Transport: Streamable HTTP
+
+Tool Definitions
+{
+  "tools": [
+    {
+      "name": "query_salesforce",
+      "description": "Query Salesforce data with user-specific security enforcement using SecuredSOQL API.\n\n⚠️ **CRITICAL: This is NOT standard Salesforce SOQL** - it uses a custom SecuredSOQL API that enforces 4 security layers and may return filtered results.\n\n**Security Layers:**\n1. **Custom Permission**: Caller must have `SecuredSOQL_API_Access` permission\n2. **Object Allowlist**: Only allowlisted objects can be queried\n3. **Field-Level Security + PII Policy**:\n   - PII/restricted fields are silently removed from SELECT (query succeeds with fewer fields)\n   - PII/restricted fields in WHERE/ORDER BY **block the entire query** (inference protection)\n4. **Row-Level Security**: Records not accessible to target user are filtered (may return fewer records than LIMIT)\n\n**Critical Behaviors for LLMs:**\n- ✅ **Always check `success` field first** (not just HTTP status)\n- ✅ **Requested fields may be silently removed** - Compare requested vs returned fields, inform user about filtering\n- ✅ **Record count may be less than LIMIT** - Due to row-level security filtering, don't assume more records exist\n- ✅ **Queries may fail even if SOQL is valid** - Restricted fields in WHERE/ORDER BY return 403 error\n- ❌ **Never hallucinate filtered data** - If a field doesn't appear, don't make up values\n\n**Response Format (Different from Standard Salesforce):**\n- Success: `{\"success\": true, \"records\": [...], \"recordCount\": N, \"timestamp\": \"...\"}`\n- Error: `{\"success\": false, \"error\": \"...\", \"statusCode\": 403, \"timestamp\": \"...\"}`\n- Records don't have `attributes` wrapper (simpler structure)\n- No `done` field (no pagination - all accessible records returned in one call)\n\n**Error Handling:**\n- \"Inference attack detected\" → Remove the mentioned field from WHERE/ORDER BY, retry\n- \"not permitted for querying\" → Object is not allowlisted\n- \"does not have permission\" → User lacks access to the object\n- \"Missing required parameter\" → Missing soql or targetUserEmail\n- \"Invalid email format\" → Provide valid email address\n- \"No user found with email\" → Email doesn't exist or user is inactive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "soql_query": {
+            "type": "string",
+            "description": "SOQL (Salesforce Object Query Language) query to execute. Example: SELECT Id, Name, Email FROM Contact LIMIT 10. ⚠️ IMPORTANT: This is NOT standard Salesforce SOQL - it uses SecuredSOQL API with 4 security layers. Avoid using potentially restricted fields in WHERE or ORDER BY clauses. Only SELECT, WHERE, ORDER BY, LIMIT, OFFSET are supported (no subqueries). Fields may be silently filtered out due to security policies."
+          }
+        },
+        "required": ["soql_query"]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "describe_salesforce_object",
+      "description": "Describe a Salesforce object to discover its structure and available fields.\n\nThis tool calls the **McpSObjectDescribe** Apex REST API. It applies the same policy checks as SecuredSOQL (caller permission, object allowlist, target user object read access) and writes audit metadata to MCP_API_Log__c. Object authorization uses the authenticated user's email from the JWT; **field-level describe reflects the integration user**, not user-specific FLS impersonation.\n\n**Use Cases:**\n- Discover what fields are available on an object\n- Understand field types (string, date, reference, etc.)\n- Find lookup relationships (which objects a reference field points to)\n- Identify custom fields vs standard fields\n\n**Response Format:**\n- Object-level: name, label, keyPrefix\n- Fields: name, label, type\n- For reference/lookup fields: also includes `referenceTo` array with referenced object names",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sobject_name": {
+            "type": "string",
+            "description": "Salesforce object API name to describe (e.g., 'Account', 'Contact', 'CustomObject__c'). Use this tool to discover available fields and their types before constructing SOQL queries. Shows both standard and custom fields. For lookup/reference fields, includes referenced object names."
+          }
+        },
+        "required": ["sobject_name"]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "upload_account_plan",
+      "description": "Upload account plan data to Salesforce Account_Plan__c object.\n\nCreates a new account plan or updates an existing one based on Account + Plan Year combination. The API automatically handles upsert logic (create if new, update if exists).\n\n**Required Fields:**\n- `AccountPlan__c` (reference, required): Salesforce Account ID (18 characters) - Lookup to Account object\n- `Plan_Year__c` (picklist, required): Plan year as picklist value (e.g., \"2026\")\n\n**Available Fields by Category:**\n\n*Basic Information:* AccountPlan__c, Plan_Year__c, Plan_Quarter__c, Name\n*Executive Summary:* Annual_Pinterest_Goals_Strategy__c\n*Client Objectives:* CEO_Strategic_Priorities__c, Business_Challenges_Priorities__c, Recent_News__c\n*Media/Marketing:* Pinterest_Account_Health__c, CMO_Marketing_Goals_Approach__c, Measurement__c, Creative_Strategy__c, Agency__c\n*Planned Key Moments:* Q1_Events__c, Q2_Events__c, Q3_Events__c, Q4_Events__c\n*Value Proposition:* Opportunity_for_Growth__c, Keys_to_Unlocking_Growth__c\n*Strategies & Tactics:* Biggest_Opportunities_to_unlock_growth__c, Q1_Objectives__c, Q2_Objectives__c, Q3_Objectives__c, Q4_Objectives__c\n*Revenue Goals:* This_Year_Annual_Spend_Est__c, Plan_Year_Goals__c, Q1_Spend_Estimate__c, Q2_Spend_Estimate__c, Q3_Spend_Estimate__c, Q4_Spend_Estimate__c\n*Leadership:* Other_Asks__c, Leadership__c, Relationship_Map__c, Primary_Contact__c, Budget_Decision_Maker__c, Highest_Level_of_Contact__c\n*Competitive:* Competitive_Landscape__c, Competitor_1__c through Competitor_3__c with Notes\n*Problem Statements:* Q1-Q4 Problem_Statement_for_Product_MSI__c with Category picklists\n*Measurement Vendors:* Measurement_Vendors__c, Q2-Q4_Measurement_Vendors__c\n*Review Cadence:* Planning_Cadence__c, Touchbase_Frequency__c, Q1-Q4_Upcoming_Meetings__c\n\n**Notes:**\n- Use `describe_salesforce_object` with 'Account_Plan__c' for technical field details\n- The API validates quarterly revenue totals sum to annual revenue\n- Reference fields require valid 18-character Salesforce IDs",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_plan_data": {
+            "type": "object",
+            "description": "Account plan data as a JSON object/dictionary with Salesforce field API names as keys. Required fields: AccountPlan__c (Account ID, 18 characters) and Plan_Year__c (Plan Year, e.g., '2026'). Use describe_salesforce_object with 'Account_Plan__c' for technical details (field types, lengths, picklist values)."
+          }
+        },
+        "required": ["account_plan_data"]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    }
+  ]
+}
+Agent System Prompt Context
+Here's a condensed system prompt block you can paste into your agent design to give it the right mental model for using these tools:
+
+
+## Salesforce MCP Server — Agent Guidelines
+You have access to a Salesforce MCP server with 3 tools. All tools authenticate
+via the caller's JWT identity and enforce Salesforce security policies per-user.
+### Recommended Tool Workflow
+1. **describe_salesforce_object** → Call FIRST to discover an object's available
+   fields, types, and relationships before writing any SOQL.
+2. **query_salesforce** → Execute SOQL queries. Always check the `success` field
+   in the response. Fields may be silently removed; never hallucinate missing data.
+3. **upload_account_plan** → Create or update account plans (upsert by Account +
+   Plan Year). Validate required fields before calling.
+### Key Constraints
+- **SecuredSOQL is NOT standard SOQL.** Only SELECT, WHERE, ORDER BY, LIMIT,
+  OFFSET are supported. No subqueries, no aggregate functions.
+- **PII fields in WHERE/ORDER BY will BLOCK the query** (403 "Inference attack
+  detected"). If this happens, remove the restricted field and retry with only
+  SELECT.
+- **Silently filtered fields:** Compare requested vs returned fields. If a field
+  is missing from the response, tell the user it was filtered by security policy.
+  Never invent values.
+- **Row-level security:** Record count may be less than LIMIT. Do not assume
+  more records exist.
+- **Object allowlist:** Not all Salesforce objects are queryable. If you get
+  "not permitted for querying", inform the user.
+### Response Handling Pattern
+```text
+result = call_tool("query_salesforce", {soql_query: "..."})
+if not result["success"]:
+    if "Inference attack detected" in result["error"]:
+        # Remove restricted field from WHERE/ORDER BY, retry
+    elif "not permitted for querying" in result["error"]:
+        # Object not allowlisted, inform user
+    elif "does not have permission" in result["error"]:
+        # User lacks access, inform user
+    else:
+        # General error, show result["error"] to user
+else:
+    # Use result["records"] and result["recordCount"]
+    # Check which fields were actually returned vs requested
+upload_account_plan Specifics
+Always provide AccountPlan__c (18-char Account ID) and Plan_Year__c
+Quarterly spend fields (Q1-Q4) must sum to annual spend (This_Year_Annual_Spend_Est__c), or the API returns a validation error
+Reference fields (Primary_Contact__c, Competitor_1__c, etc.) require valid 18-character Salesforce IDs — use query_salesforce to look these up first
+The API auto-upserts: creates if Account+Year combo is new, updates if exists
+
